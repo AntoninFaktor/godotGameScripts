@@ -13,8 +13,12 @@ func Exit () -> void:
 func Update(delta: float) -> void:
 	if player.is_dead:
 		Transitioned.emit(self, 'playerDied')
+	if player.is_carrying:
+		Transitioned.emit(self, 'playerCarryMove')
+		
 func Physics_Update(delta: float) -> void:
 	player.animated_sprite.play('move')
+	player.get_node('AudioStreamPlayer2D2').pitch_scale=randf_range(.9, 1.1)
 	var input_direction : Vector2 = Input.get_vector('right', 'left', 'up', 'down') * Vector2 (-1, 1)
 	if input_direction.length() !=0:
 		player.velocity = input_direction * move_speed

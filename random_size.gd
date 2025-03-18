@@ -6,7 +6,7 @@ extends Node
 func _ready() -> void:
 	var ran_num: float = randf_range(.9,1.1)
 	self.scale = self.scale*ran_num
-	if ran_num*randf_range(-1,1) > 0:
-		animated_sprite_2d.flip_h = true
+	if ran_num*randi_range(-1,1) > 0:
+		self.scale.x = 1
 	else:
-		animated_sprite_2d.flip_h = false
+		self.scale.x = -1
