@@ -15,7 +15,7 @@ func take_damage(attack: Attack) -> void:
 	if health == 0:
 		get_parent().is_dead = true
 	
-func set_shader_blink_intensity(newValue: float):
+func set_shader_blink_intensity(newValue: float) -> void:
 	player.get_node('pawnSprite').material.set_shader_parameter('blink_intesity', newValue )
 
 func _process(delta: float) -> void:

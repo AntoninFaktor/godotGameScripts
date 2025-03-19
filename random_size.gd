@@ -1,8 +1,6 @@
 extends Node
 
-@onready var animated_sprite_2d: AnimatedSprite2D = $AnimatedSprite2D
-
-# Called when the node enters the scene tree for the first time.
+#Ranmdomize scale as well as flipping the sprite
 func _ready() -> void:
 	var ran_num: float = randf_range(.9,1.1)
 	self.scale = self.scale*ran_num

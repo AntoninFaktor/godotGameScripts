@@ -13,21 +13,14 @@ func handle_states() -> void:
 	next_state = 'playerIdle'
 	if is_dead:
 		next_state = 'playerDied'
-	if is_carrying:
-		next_state = 'playerCarryIdle'
 	if Input.is_action_pressed('attack'):
 		next_state = 'playerAttack'
 	if Input.get_vector('left', 'right', 'up', 'down') != Vector2.ZERO:
-		if is_carrying:
-			next_state = 'playerCarryMove'
-		else:
-			next_state = 'playerMove'
-
+		next_state = 'playerMove'
 
 func _physics_process(delta: float) -> void:
 	handle_states()
 	move_and_slide()
 
 func _on_health_component_current_health(health: Variant) -> void:
-
 	current_health = health
