@@ -4,7 +4,7 @@ class_name healthComponent
 @export var player: CharacterBody2D
 signal current_health(health:int)
 
-@export var health: int= 3:
+@export var health: int:
 	set(value):
 		health = clamp(value, 0, 3)
 

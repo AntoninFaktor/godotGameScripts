@@ -1,7 +1,6 @@
 extends CharacterBody2D
 
 @onready var pawn_sprite: Sprite2D = $pawnSprite
-
 @onready var animated_sprite: AnimationPlayer = $AnimationPlayer
 
 var next_state: String
@@ -20,7 +19,8 @@ func handle_states() -> void:
 
 func _physics_process(delta: float) -> void:
 	handle_states()
-	move_and_slide()
+	MotionMode.MOTION_MODE_FLOATING
+	move_and_collide(velocity * delta)
 
 func _on_health_component_current_health(health: Variant) -> void:
 	current_health = health
