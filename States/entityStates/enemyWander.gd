@@ -8,7 +8,7 @@ var move_direction : Vector2
 var wander_time : float
 var animation_player: AnimationPlayer
 var sprite: Sprite2D
-var enter_vacinity_range: int
+var alert_range: int
 
 func randomize_wander() -> void:
 	move_direction = Vector2(randf_range(-1,1), randf_range(-1,1)).normalized()
@@ -21,7 +21,7 @@ func Enter() -> void:
 	sprite = enemy.get_node('Sprite2D')
 	randomize_wander()
 	move_speed = enemy.move_speed*.6
-	enter_vacinity_range = enemy.enter_vacinity_range
+	alert_range = enemy.alert_range
 
 func Update(delta: float) -> void:
 	if wander_time > 0:
@@ -41,5 +41,5 @@ func Physics_Update(delta: float) -> void:
 	
 	var direction: Vector2 = player.global_position - enemy.global_position
 	
-	if direction.length() < enter_vacinity_range:
+	if direction.length() < alert_range:
 		Transitioned.emit(self, 'enemyFollow')

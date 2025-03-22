@@ -29,5 +29,3 @@ func Physics_Update(delta: float) -> void:
 			Transitioned.emit(self, 'enemyTicking')
 		else:
 			pass
-		
-		
