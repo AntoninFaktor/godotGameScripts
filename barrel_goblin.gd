@@ -47,7 +47,7 @@ func _on_follow_state_entered() -> void:
 	animation_player.play("move")
 
 func _on_follow_state_processing(delta: float) -> void:
-	velocity = distance.normalized() * move_speed
+	velocity = (distance.normalized()+player.velocity.normalized()) * move_speed
 	if distance.length() > leave_alert_range or player.velocity.length() > 0:
 		state_chart.send_event('stop following')
 	elif distance.length() < attack_range:

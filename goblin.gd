@@ -6,6 +6,8 @@ class_name Goblin2
 @onready var hitbox: Area2D = $hitbox
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var player: CharacterBody2D = get_tree().get_first_node_in_group('player')
+@onready var state_chart: StateChart = $StateChart
+
 var is_dead: bool = false
 var direction: Vector2
 var wander_time: float
@@ -17,7 +19,6 @@ var distance: Vector2
 @export var attack_range: int
 @export var alert_range: int
 @export var leave_alert_range: int
-
 
 func _physics_process(delta: float) -> void:
 	move_and_slide()
@@ -43,7 +44,7 @@ func _on_idle_state_entered() -> void:
 
 func _on_idle_state_processing(delta: float) -> void:
 	if distance.length() < alert_range and !player.is_dead:
-		$"StateChart/GoblinStates/Idle/To Follow".take()
+		state_chart.send_event('start following')
 
 # WANDER STATE
 var i: int = 0
@@ -59,7 +60,7 @@ func _on_wander_state_processing(delta: float) -> void:
 	if wander_time > 0:
 		wander_time -= delta
 	elif i > 3:
-		$"StateChart/GoblinStates/Wander/To Idle".take()
+		state_chart.send_event('to idle')
 		i = 0
 	else:
 		i += 1	
@@ -68,9 +69,10 @@ func _on_wander_state_processing(delta: float) -> void:
 func _on_wander_state_physics_processing(delta: float) -> void:
 	if is_on_ceiling() || is_on_floor() || is_on_wall():
 		direction = direction * -1
-	velocity = direction * (move_speed * .6)
+	velocity.x = move_toward(velocity.x, direction.x*move_speed*.6, 5) 
+	velocity.y = move_toward(velocity.y, direction.y*move_speed*.6, 5) 
 	if distance.length() < alert_range:
-		$"StateChart/GoblinStates/Wander/To Follow".take()
+		state_chart.send_event('start following')
 		
 # FOLLOW STATE
 func _on_follow_state_entered() -> void:
@@ -80,35 +82,36 @@ func _on_follow_state_entered() -> void:
 func _on_follow_state_processing(delta: float) -> void:
 	velocity = distance.normalized() * move_speed
 	if distance.length() > leave_alert_range:
-		$"StateChart/GoblinStates/Follow/To Wander".take()
+		state_chart.send_event('start wandering')
 	elif distance.length() < attack_range:
-		$"StateChart/GoblinStates/Follow/To Attack".take()
+		state_chart.send_event('start attacking')
 		
 # ATTACK STATE
+func enable_collision():
+	$hitbox/CollisionShape2D.disabled = false
+	
 func _on_attack_state_entered() -> void:
 	velocity = Vector2.ZERO
-	await get_tree().create_timer(.16).timeout
-	$hitbox/CollisionShape2D.disabled = false
 
 func _on_attack_state_processing(delta: float) -> void:
 	if distance.length() > attack_range:
-		$"StateChart/GoblinStates/Attack/To Follow".take()
+		state_chart.send_event('start following')
 	if player.is_dead:
-		$"StateChart/GoblinStates/Attack/To Idle".take()
+		state_chart.send_event('idle')
 
 func _on_attack_state_physics_processing(delta: float) -> void:
-	$AudioStreamPlayer2D.pitch_scale=randf_range(.9, 1.1)
-	if distance.x < 0:
+	$AudioStreamPlayer2D.pitch_scale=randf_range(.8, 1.2)
+	if distance.normalized().x < 0:
 		sprite.flip_h = true
 		hitbox.scale.x = -1
-	elif distance.x < 0:
+	if distance.normalized().x > 0:
 		sprite.flip_h = false
 		hitbox.scale.x = 1
 	if abs(distance.x) > abs(distance.y):
 		animation_player.play('attack_horizontal')
-	elif distance.y < 0:
+	elif distance.normalized().y < 0:
 		animation_player.play('attack_up')
-	elif distance.y > 0:
+	elif distance.normalized().y > 0:
 		animation_player.play('attack_down')
 
 func _on_attack_state_exited() -> void:

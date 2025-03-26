@@ -23,4 +23,10 @@ func _physics_process(delta: float) -> void:
 	move_and_collide(velocity * delta)
 
 func _on_health_component_current_health(health: Variant) -> void:
+	if current_health != health:
+		var tween = get_tree().create_tween()
+		tween.tween_method(set_shader_blink_intensity, 1.0, 0.0, 0.5)
 	current_health = health
+
+func set_shader_blink_intensity(newValue: float) -> void:
+	get_node('pawnSprite').material.set_shader_parameter('blink_intesity', newValue )

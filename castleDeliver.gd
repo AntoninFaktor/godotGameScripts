@@ -1,5 +1,7 @@
 extends StaticBody2D
 
+class_name Castle
+
 var player: CharacterBody2D
 @onready var game_manager: Node = %GameManager
 @onready var audio_stream_player_2d: AudioStreamPlayer2D = $AudioStreamPlayer2D
