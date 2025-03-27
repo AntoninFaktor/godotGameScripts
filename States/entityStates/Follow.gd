@@ -1,5 +1,5 @@
 extends State
-class_name enemyFollow
+class_name Follow
 
 @export var enemy: CharacterBody2D
 @export var sneak: bool = false

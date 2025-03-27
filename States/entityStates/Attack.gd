@@ -1,5 +1,5 @@
 extends State
-class_name enemyAttack
+class_name Attack
 
 @export var enemy: CharacterBody2D
 var player: CharacterBody2D

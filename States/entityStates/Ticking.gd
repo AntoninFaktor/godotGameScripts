@@ -1,5 +1,5 @@
 extends State
-class_name enemyTicking
+class_name Ticking
 
 @export var enemy: CharacterBody2D
 

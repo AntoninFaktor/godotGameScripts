@@ -1,5 +1,5 @@
 extends State
-class_name enemyIdle
+class_name Idle
 
 @export var enemy: CharacterBody2D
 
