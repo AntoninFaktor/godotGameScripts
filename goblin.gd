@@ -4,14 +4,29 @@ class_name Goblin2
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var hitbox_component: hitboxComponent = $hitboxComponent
 @onready var hitbox: Area2D = $hitbox
-@onready var sprite: Sprite2D = $Sprite2D
+@onready var sprite: Sprite2D = $Sprite
 @onready var player: CharacterBody2D = get_tree().get_first_node_in_group('player')
+@onready var last_known_position: Vector2 = player.global_position
 @onready var state_chart: StateChart = $StateChart
+@onready var line_of_sight: RayCast2D = RayCast2D.new()
+@onready var raycasts_node: Node2D = $Raycasts
+
 
 var is_dead: bool = false
-var direction: Vector2
 var wander_time: float
 var distance: Vector2
+var repulsion_dir: Vector2
+
+@export var avoidance_radius: int = 40
+@export var goal_weight: float = 10.0
+@export var avoidance_weight: float = 20.0
+@export var repulsion_strenght: float = .75
+var num_dir: int = 36
+var num_rays: int = 18
+
+var directions: Array = []
+var raycasts: Array = []
+var last_known_velocity: Vector2 = Vector2.ZERO
 
 #enemy stats
 @export var dmg: int
@@ -20,15 +35,116 @@ var distance: Vector2
 @export var alert_range: int
 @export var leave_alert_range: int
 
+enum States {IDLE, WANDER, FOLLOW, ATTACK, DEAD}
+@export var curr_state : States
+var next_state: States
+
+func update_state() -> void:
+	curr_state = next_state
+	match curr_state:
+		States.IDLE:
+			state_chart.send_event('idle')
+		States.WANDER:
+			state_chart.send_event('wander')
+		States.FOLLOW:
+			state_chart.send_event('follow')
+		States.ATTACK:
+			state_chart.send_event('attack')
+		States.DEAD:
+			state_chart.send_event('dead')
+			
+func get_next_state() -> void:
+	if is_dead:
+		next_state = States.DEAD
+	elif player.is_dead:
+		next_state = States.IDLE
+	elif distance.length() < attack_range:
+		next_state = States.ATTACK
+	elif distance.length() < alert_range and has_line_of_sight():
+		next_state = States.FOLLOW
+	elif distance.length() > leave_alert_range:
+		next_state = States.WANDER
+
+
+func _ready():
+	# Initialize raycasts for obstacle avoidance
+	for i in range(num_rays):
+		var raycast: RayCast2D = RayCast2D.new()
+		raycast.target_position = Vector2(cos(deg_to_rad(i * (360 / num_rays))), sin(deg_to_rad(i * (360 / num_rays)))) * avoidance_radius
+		raycast.enabled = true
+		raycasts.append(raycast)
+		raycasts_node.add_child(raycast)
+	# Add a RayCast2D for line of sight
+	line_of_sight.enabled = true
+	add_child(line_of_sight)
+	update_state()
+
 func _physics_process(delta: float) -> void:
-	move_and_slide()
 	distance = player.global_position - global_position
+	get_next_state()
+	if curr_state != next_state:
+		update_state()
+	move_and_slide()
 	if velocity.x > 0:
 		sprite.flip_h = false
 	elif velocity.x < 0:
 		sprite.flip_h = true
-	if is_dead:
-		queue_free()
+
+func generate_directions():
+	directions.clear()
+	#Generate possible directions for movement
+	for i in range(num_dir):
+		var angle = deg_to_rad(i * 360 / num_dir)
+		directions.append(Vector2(cos(angle), sin(angle)))
+		
+func get_best_direction():
+	generate_directions()
+	var target_vector: Vector2 = last_known_position - global_position
+	var best_direction: Vector2 = Vector2.ZERO
+	var best_score: float = -float("inf")
+	
+	for dir in directions:
+		var dir_normalized: Vector2 = dir.normalized()
+		var goal_attraction: float = target_vector.normalized().dot(dir_normalized)
+		var obstacle_penalty: int = 0
+		if is_direction_blocked(dir):
+			obstacle_penalty = 10
+		var distance_to_goal: float = (global_position + dir).distance_to(last_known_position)*.1
+		var distance_penalty: float = distance_to_goal / avoidance_radius
+		if goal_attraction < 0:
+			distance_penalty *= 0.5
+		var score: float = (goal_weight * goal_attraction) - (avoidance_weight * obstacle_penalty) - distance_penalty
+		if score > best_score:
+			best_direction = dir
+			best_score = score
+	
+	return best_direction
+	
+func is_direction_blocked(direction: Vector2) -> bool:
+	for raycast in raycasts:
+		raycast.force_raycast_update()
+		if raycast.is_colliding():
+			var raycast_dir = raycast.target_position.normalized()
+			if raycast_dir.dot(direction.normalized()) > 0.9:
+				return true
+	return false
+	
+func get_repulsion_vector() -> Vector2:
+	var repulsion: Vector2 = Vector2.ZERO
+	for raycast in raycasts:
+		raycast.force_raycast_update()
+		if raycast.is_colliding():
+			# Get the direction of the colliding raycast
+			var raycast_dir: Vector2 = raycast.target_position.normalized()
+			# Add a repulsion force in the opposite direction
+			repulsion -= raycast_dir
+	repulsion_dir = get_repulsion_vector() * repulsion_strenght
+	return repulsion_dir
+
+func has_line_of_sight() -> bool:
+		line_of_sight.target_position = player.global_position - global_position
+		line_of_sight.force_raycast_update()
+		return not line_of_sight.is_colliding()
 
 func _on_hitbox_area_entered(area: Area2D) -> void:
 	if area is hitboxComponent:
@@ -37,67 +153,73 @@ func _on_hitbox_area_entered(area: Area2D) -> void:
 		attack.attack_dmg = dmg
 		hitbox.take_dmg(attack)
 
-# IDLE STATE
+#region IDLE STATE
 func _on_idle_state_entered() -> void:
 	velocity = Vector2.ZERO
 	animation_player.play("idle")
 
-func _on_idle_state_processing(delta: float) -> void:
-	if distance.length() < alert_range and !player.is_dead:
-		state_chart.send_event('start following')
+func _on_to_wander_taken() -> void:
+	next_state = States.WANDER
 
-# WANDER STATE
-var i: int = 0
-func randomize_wander() -> void:
-	direction = Vector2(randf_range(-1,1), randf_range(-1,1)).normalized()
-	wander_time = randf_range(1, 3)
+#endregion
 
+@export var wander_radius: int = 20   	# Radius of the wander circle
+@export var wander_distance: int = 50	# Distance of the wander circle from the enemy
+@export var wander_jitter: int = 1   	# Amount of randomness added to the wander angle
+@export var wander_angle: float = 0.  		# Current wander angle
+
+#region WANDER STATE
 func _on_wander_state_entered() -> void:
-	animation_player.play("move")
-	randomize_wander()
-	
+	animation_player.play('move')
+	wander_time = randf_range(4, 10)
+func _on_wander_state_physics_processing(delta: float) -> void:
+	var forward: Vector2 = velocity.normalized()
+	if forward == Vector2.ZERO:
+		forward = Vector2(randf_range(-1,1), randf_range(-1,1))
+	var circle_center: Vector2 = global_position + forward * wander_distance
+	wander_angle += randf_range(-wander_jitter, wander_jitter)
+	var offset_x: float = wander_radius * cos(wander_angle)
+	var offset_y: float = wander_radius * sin(wander_angle)
+	var wander_offset: Vector2 = Vector2(offset_x, offset_y)
+	var target: Vector2 = circle_center + wander_offset
+	if is_on_ceiling() || is_on_floor() || is_on_wall():
+		target = target * -1
+	var desired_velocity: Vector2 = (target - global_position + repulsion_dir).normalized() * move_speed * .6
+	velocity = velocity.lerp(desired_velocity, 0.1)  # Combine wander and avoidance
+		
 func _on_wander_state_processing(delta: float) -> void:
 	if wander_time > 0:
 		wander_time -= delta
-	elif i > 3:
-		state_chart.send_event('to idle')
-		i = 0
 	else:
-		i += 1	
-		randomize_wander()
-	
-func _on_wander_state_physics_processing(delta: float) -> void:
-	if is_on_ceiling() || is_on_floor() || is_on_wall():
-		direction = direction * -1
-	velocity.x = move_toward(velocity.x, direction.x*move_speed*.6, 5) 
-	velocity.y = move_toward(velocity.y, direction.y*move_speed*.6, 5) 
-	if distance.length() < alert_range:
-		state_chart.send_event('start following')
-		
-# FOLLOW STATE
-func _on_follow_state_entered() -> void:
-	animation_player.play("move")
+		state_chart.send_event('idle')
+		next_state = States.IDLE
+#endregion
 
+#region FOLLOW STATE
+func _on_follow_state_entered() -> void:
+	animation_player.play('move')
 
 func _on_follow_state_processing(delta: float) -> void:
-	velocity = distance.normalized() * move_speed
-	if distance.length() > leave_alert_range:
-		state_chart.send_event('start wandering')
-	elif distance.length() < attack_range:
-		state_chart.send_event('start attacking')
-		
-# ATTACK STATE
-func enable_collision():
+	var best_dir: Vector2
+	if has_line_of_sight():
+		last_known_position = player.global_position
+		last_known_velocity = player.velocity.normalized()
+		best_dir = get_best_direction() + last_known_velocity
+	else:
+		if global_position.distance_to(last_known_position) > 40:
+			best_dir = get_best_direction()+last_known_velocity
+		else:
+				next_state = States.WANDER
+	var desired_velocity = (best_dir+repulsion_dir).normalized() * move_speed
+	velocity = velocity.lerp(desired_velocity, .33)
+#endregion
+
+#region ATTACK STATE
+func enable_collision() -> void:
 	$hitbox/CollisionShape2D.disabled = false
 	
 func _on_attack_state_entered() -> void:
 	velocity = Vector2.ZERO
-
-func _on_attack_state_processing(delta: float) -> void:
-	if distance.length() > attack_range:
-		state_chart.send_event('start following')
-	if player.is_dead:
-		state_chart.send_event('idle')
 
 func _on_attack_state_physics_processing(delta: float) -> void:
 	$AudioStreamPlayer2D.pitch_scale=randf_range(.8, 1.2)
@@ -116,3 +238,4 @@ func _on_attack_state_physics_processing(delta: float) -> void:
 
 func _on_attack_state_exited() -> void:
 	$hitbox/CollisionShape2D.disabled = true
+#endregion
