@@ -13,7 +13,7 @@ func new_spawn() -> void:
 func _on_body_entered(body: Node2D) -> void:
 	if !player.is_carrying:
 		player.is_carrying = true
-		await new_spawn()
+		new_spawn()
 		while bag.get_overlapping_areas():
 			new_spawn()
 		bag.get_node('AudioStreamPlayer2D').playing = true

@@ -1,7 +1,5 @@
 extends CharacterBody2D
 
-class_name FollowState
-
 @onready var player: CharacterBody2D = get_tree().get_first_node_in_group('player')
 @onready var raycasts_node: Node2D = $Raycasts
 @onready var line_of_sight: RayCast2D = RayCast2D.new()
