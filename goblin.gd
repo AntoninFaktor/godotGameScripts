@@ -2,8 +2,7 @@ extends CharacterBody2D
 class_name Goblin2
 
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
-@onready var hitbox_component: hitboxComponent = $hitboxComponent
-@onready var hitbox: Area2D = $hitbox
+@onready var hitbox: Area2D = $Components/hitbox
 @onready var sprite: Sprite2D = $Sprite
 @onready var player: CharacterBody2D = get_tree().get_first_node_in_group('player')
 @onready var last_known_position: Vector2 = player.global_position
@@ -19,6 +18,7 @@ var distance: Vector2
 @export var goal_weight: float = 10.0
 @export var avoidance_weight: float = 20.0
 @export var repulsion_strenght: float = .75
+var best_dir_args: Array
 var num_dir: int = 24
 var last_known_velocity: Vector2 = Vector2.ZERO
 
@@ -37,6 +37,9 @@ func _ready():
 	add_child(line_of_sight)
 	update_state()
 
+func _process(delta: float) -> void:
+	best_dir_args = [last_known_position, num_dir, repulsion_strenght, avoidance_radius, goal_weight, avoidance_weight]
+
 func _physics_process(delta: float) -> void:
 	distance = player.global_position - global_position
 	get_next_state()
@@ -47,7 +50,7 @@ func _physics_process(delta: float) -> void:
 		sprite.flip_h = false
 	elif velocity.x < 0:
 		sprite.flip_h = true
-	
+
 func has_line_of_sight() -> bool:
 		line_of_sight.target_position = player.global_position - global_position
 		line_of_sight.force_raycast_update()
@@ -59,7 +62,6 @@ func _on_hitbox_area_entered(area: Area2D) -> void:
 		var attack: Attack = Attack.new()
 		attack.attack_dmg = dmg
 		hitbox.take_dmg(attack)
-
 
 enum States {IDLE, WANDER, FOLLOW, ATTACK, DEAD}
 @export var curr_state : States
@@ -106,7 +108,7 @@ func _on_to_wander_taken() -> void:
 @export var wander_radius: int = 20   	# Radius of the wander circle
 @export var wander_distance: int = 50	# Distance of the wander circle from the enemy
 @export var wander_jitter: int = 1   	# Amount of randomness added to the wander angle
-@export var wander_angle: float 		# Current wander angle
+var wander_angle: float 		# Current wander angle
 
 #region WANDER STATE
 func _on_wander_state_entered() -> void:
@@ -124,7 +126,9 @@ func _on_wander_state_physics_processing(delta: float) -> void:
 	var target: Vector2 = circle_center + wander_offset
 	if pathfinder.is_direction_blocked(target):
 		target -= target
-	var best_dir = pathfinder.get_best_direction(target, num_dir/2, repulsion_strenght, avoidance_radius, goal_weight, avoidance_weight)
+	best_dir_args[0] = target
+	best_dir_args[1] = num_dir/2
+	var best_dir = pathfinder.callv('get_best_direction', best_dir_args)
 	var desired_velocity: Vector2 = best_dir.normalized() * move_speed * .6
 	velocity = velocity.lerp(desired_velocity, 0.1)  # Combine wander and avoidance
 		
@@ -145,10 +149,10 @@ func _on_follow_state_processing(delta: float) -> void:
 	if has_line_of_sight():
 		last_known_position = player.global_position
 		last_known_velocity = player.velocity.normalized()
-		best_dir = pathfinder.get_best_direction(last_known_position, num_dir, repulsion_strenght, avoidance_radius, goal_weight, avoidance_weight)
+		best_dir = pathfinder.callv('get_best_direction', best_dir_args)
 	else:
 		if global_position.distance_to(last_known_position) > 40:
-			best_dir = pathfinder.get_best_direction(last_known_position, num_dir, repulsion_strenght, avoidance_radius, goal_weight, avoidance_weight)
+			best_dir = pathfinder.callv('get_best_direction', best_dir_args)
 		else:
 				next_state = States.WANDER
 	var desired_velocity = (best_dir).normalized() * move_speed
@@ -157,7 +161,7 @@ func _on_follow_state_processing(delta: float) -> void:
 
 #region ATTACK STATE
 func enable_collision() -> void:
-	$hitbox/CollisionShape2D.disabled = false
+	$Components/hitbox/CollisionShape2D.disabled = false
 	
 func _on_attack_state_entered() -> void:
 	velocity = Vector2.ZERO
@@ -178,7 +182,7 @@ func _on_attack_state_physics_processing(delta: float) -> void:
 		animation_player.play('attack_down')
 
 func _on_attack_state_exited() -> void:
-	$hitbox/CollisionShape2D.disabled = true
+	$Components/hitbox/CollisionShape2D.disabled = true
 #endregion
 
 #region DEAD STATE
