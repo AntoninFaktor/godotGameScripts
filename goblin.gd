@@ -9,21 +9,17 @@ class_name Goblin2
 @onready var last_known_position: Vector2 = player.global_position
 @onready var state_chart: StateChart = $StateChart
 @onready var line_of_sight: RayCast2D = RayCast2D.new()
-@onready var raycasts_node: Node2D = $Raycasts
+@onready var pathfinder: PathfinderComponent = $Components/PathfinderComponent
 
 var is_dead: bool = false
 var wander_time: float
 var distance: Vector2
-var repulsion_dir: Vector2
 
 @export var avoidance_radius: int = 40
 @export var goal_weight: float = 10.0
 @export var avoidance_weight: float = 20.0
 @export var repulsion_strenght: float = .75
-var num_dir: int = 36
-var num_rays: int = 18
-var directions: Array = []
-var raycasts: Array = []
+var num_dir: int = 24
 var last_known_velocity: Vector2 = Vector2.ZERO
 
 #enemy stats
@@ -35,12 +31,7 @@ var last_known_velocity: Vector2 = Vector2.ZERO
 
 func _ready():
 	# Initialize raycasts for obstacle avoidance
-	for i in range(num_rays):
-		var raycast: RayCast2D = RayCast2D.new()
-		raycast.target_position = Vector2(cos(deg_to_rad(i * (360 / num_rays))), sin(deg_to_rad(i * (360 / num_rays)))) * avoidance_radius
-		raycast.enabled = true
-		raycasts.append(raycast)
-		raycasts_node.add_child(raycast)
+	pathfinder.initialize_raycasts(num_dir, avoidance_radius)
 	# Add a RayCast2D for line of sight
 	line_of_sight.enabled = true
 	add_child(line_of_sight)
@@ -57,18 +48,6 @@ func _physics_process(delta: float) -> void:
 	elif velocity.x < 0:
 		sprite.flip_h = true
 	
-func get_repulsion_vector() -> Vector2:
-	var repulsion: Vector2 = Vector2.ZERO
-	for raycast in raycasts:
-		raycast.force_raycast_update()
-		if raycast.is_colliding():
-			# Get the direction of the colliding raycast
-			var raycast_dir: Vector2 = raycast.target_position.normalized()
-			# Add a repulsion force in the opposite direction
-			repulsion -= raycast_dir
-	repulsion_dir = get_repulsion_vector() * repulsion_strenght
-	return repulsion_dir
-
 func has_line_of_sight() -> bool:
 		line_of_sight.target_position = player.global_position - global_position
 		line_of_sight.force_raycast_update()
@@ -127,7 +106,7 @@ func _on_to_wander_taken() -> void:
 @export var wander_radius: int = 20   	# Radius of the wander circle
 @export var wander_distance: int = 50	# Distance of the wander circle from the enemy
 @export var wander_jitter: int = 1   	# Amount of randomness added to the wander angle
-@export var wander_angle: float = 0.  		# Current wander angle
+@export var wander_angle: float 		# Current wander angle
 
 #region WANDER STATE
 func _on_wander_state_entered() -> void:
@@ -143,9 +122,10 @@ func _on_wander_state_physics_processing(delta: float) -> void:
 	var offset_y: float = wander_radius * sin(wander_angle)
 	var wander_offset: Vector2 = Vector2(offset_x, offset_y)
 	var target: Vector2 = circle_center + wander_offset
-	if is_on_ceiling() || is_on_floor() || is_on_wall():
-		target = target * -1
-	var desired_velocity: Vector2 = (target - global_position + repulsion_dir).normalized() * move_speed * .6
+	if pathfinder.is_direction_blocked(target):
+		target -= target
+	var best_dir = pathfinder.get_best_direction(target, num_dir/2, repulsion_strenght, avoidance_radius, goal_weight, avoidance_weight)
+	var desired_velocity: Vector2 = best_dir.normalized() * move_speed * .6
 	velocity = velocity.lerp(desired_velocity, 0.1)  # Combine wander and avoidance
 		
 func _on_wander_state_processing(delta: float) -> void:
@@ -157,45 +137,6 @@ func _on_wander_state_processing(delta: float) -> void:
 #endregion
 
 #region FOLLOW STATE
-func generate_directions():
-	directions.clear()
-	#Generate possible directions for movement
-	for i in range(num_dir):
-		var angle = deg_to_rad(i * 360 / num_dir)
-		directions.append(Vector2(cos(angle), sin(angle)))
-		
-func get_best_direction():
-	generate_directions()
-	var target_vector: Vector2 = last_known_position - global_position
-	var best_direction: Vector2 = Vector2.ZERO
-	var best_score: float = -float("inf")
-	
-	for dir in directions:
-		var dir_normalized: Vector2 = dir.normalized()
-		var goal_attraction: float = target_vector.normalized().dot(dir_normalized)
-		var obstacle_penalty: int = 0
-		if is_direction_blocked(dir):
-			obstacle_penalty = 10
-		var distance_to_goal: float = (global_position + dir).distance_to(last_known_position)*.1
-		var distance_penalty: float = distance_to_goal / avoidance_radius
-		if goal_attraction < 0:
-			distance_penalty *= 0.5
-		var score: float = (goal_weight * goal_attraction) - (avoidance_weight * obstacle_penalty) - distance_penalty
-		if score > best_score:
-			best_direction = dir
-			best_score = score
-	
-	return best_direction
-	
-func is_direction_blocked(direction: Vector2) -> bool:
-	for raycast in raycasts:
-		raycast.force_raycast_update()
-		if raycast.is_colliding():
-			var raycast_dir = raycast.target_position.normalized()
-			if raycast_dir.dot(direction.normalized()) > 0.9:
-				return true
-	return false
-
 func _on_follow_state_entered() -> void:
 	animation_player.play('move')
 
@@ -204,13 +145,13 @@ func _on_follow_state_processing(delta: float) -> void:
 	if has_line_of_sight():
 		last_known_position = player.global_position
 		last_known_velocity = player.velocity.normalized()
-		best_dir = get_best_direction()
+		best_dir = pathfinder.get_best_direction(last_known_position, num_dir, repulsion_strenght, avoidance_radius, goal_weight, avoidance_weight)
 	else:
 		if global_position.distance_to(last_known_position) > 40:
-			best_dir = get_best_direction()
+			best_dir = pathfinder.get_best_direction(last_known_position, num_dir, repulsion_strenght, avoidance_radius, goal_weight, avoidance_weight)
 		else:
 				next_state = States.WANDER
-	var desired_velocity = (best_dir+repulsion_dir).normalized() * move_speed
+	var desired_velocity = (best_dir).normalized() * move_speed
 	velocity = velocity.lerp(desired_velocity, .33)
 #endregion
 

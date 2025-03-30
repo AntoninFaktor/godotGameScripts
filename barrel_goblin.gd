@@ -55,7 +55,6 @@ func _physics_process(delta: float) -> void:
 		sprite.flip_h = false
 	elif velocity.x < 0:
 		sprite.flip_h = true
-	print(curr_state, next_state)
 
 func _on_hitbox_component_area_entered(area: Area2D) -> void:
 	if area is hitboxComponent:

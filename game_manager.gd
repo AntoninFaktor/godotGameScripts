@@ -9,7 +9,7 @@ var barrel_goblin = preload('res://scenes/barrel_goblin.tscn')
 @onready var grass_layer: TileMapLayer = $"../GrassLayer"
 @onready var tiles = grass_layer.get_used_cells_by_id()
 
-func spawn(enemy: Node) -> void:
+func spawn(enemy) -> void:
 	var instance = enemy.instantiate()
 	goblins.call_deferred('add_child',instance)
 	instance.global_position = tiles[ randi() % tiles.size() ] * grass_layer.tile_set.tile_size
