@@ -12,11 +12,14 @@ const DIRECTION_BLOCK_THRESHOLD: float = 0.8
 const DISTANCE_PENALTY_FACTOR: float = 0.1
 const GOAL_ATTRACTION_FACTOR: float = 0.5
 
-func initialize_raycasts(num_rays:int, avoidance_radius) -> void:
+func initialize_raycasts(num_rays:int, avoidance_radius: int, mask: int = 1) -> void:
 		# Initialize raycasts for obstacle avoidance
 	for i:int in range(num_rays):
 		var raycast: RayCast2D = RayCast2D.new()
 		raycast.target_position = Vector2(cos(deg_to_rad(i * (360 / num_rays))), sin(deg_to_rad(i * (360 / num_rays)))) * avoidance_radius
+		if mask != 1:
+			raycast.set_collision_mask_value(1, false)
+			raycast.set_collision_mask_value(mask, true)
 		raycast.enabled = true
 		raycasts.append(raycast)
 		entity.add_child(raycast)
@@ -30,7 +33,7 @@ func calculate_goal_attraction(target_vector: Vector2, direction: Vector2)-> flo
 
 func calculate_obstacle_penalty(direction: Vector2) -> int:
 	if is_direction_blocked(direction):
-		return 1 
+		return 2 
 	else:
 		return 0
 
@@ -42,7 +45,7 @@ func get_repulsion_vector(repulsion_strenght:float) -> Vector2:
 	var blocked_directions: Array = []
 	var repulsion: Vector2 = Vector2.ZERO
 	var repulsion_dir: Vector2 = Vector2.ZERO
-	for raycast in raycasts:
+	for raycast: RayCast2D in raycasts:
 		if raycast.is_colliding():
 			# Get the direction of the colliding raycast
 			var raycast_dir: Vector2 = raycast.target_position
@@ -50,7 +53,7 @@ func get_repulsion_vector(repulsion_strenght:float) -> Vector2:
 			repulsion -= raycast_dir
 			blocked_directions.append(repulsion)
 			
-	for rep_dir in blocked_directions:
+	for rep_dir: Vector2 in blocked_directions:
 		repulsion_dir += rep_dir
 
 	repulsion_dir = repulsion_dir.normalized() * repulsion_strenght

@@ -17,6 +17,8 @@ class_name barrelGoblin
 @export var alert_range: int
 @export var leave_alert_range: int
 
+var is_dead: bool = false
+
 @export var avoidance_radius: int
 @export var goal_weight: float = 10.0
 @export var avoidance_weight: float = 20.0
@@ -28,6 +30,13 @@ var last_known_velocity: Vector2 = Vector2.ZERO
 enum States {IDLE, FOLLOW, TICK}
 @export var curr_state : States
 var next_state: States
+
+func _on_hitbox_area_entered(area: Area2D) -> void:
+	if area is hitboxComponent:
+		var hitbox: hitboxComponent = area
+		var attack: Attack = Attack.new()
+		attack.attack_dmg = dmg
+		hitbox.take_dmg(attack)
 
 func _ready() -> void:
 	distance = player.global_position - global_position
@@ -78,8 +87,10 @@ func get_next_state() -> void:
 		next_state = States.IDLE
 	elif curr_state == States.TICK:
 		next_state = curr_state
+	elif is_dead:
+		next_state = States.TICK
+		$"../../GameManager".add_score()
 	elif distance.length() < attack_range:
-		print('boom')
 		next_state = States.TICK
 	elif distance.length() < alert_range and not has_line_of_sight():
 		next_state = States.FOLLOW
@@ -115,9 +126,10 @@ func _on_follow_state_processing(delta: float) -> void:
 #endregion
 
 #region TICK STATE
+func clear_on_dead() -> void:
+	queue_free()
 func _on_tick_state_entered() -> void:
+	is_dead = true
 	velocity = Vector2.ZERO
 	animation_player.play('attack')
-	await get_tree().create_timer(2.6).timeout
-	queue_free()
 #endregion

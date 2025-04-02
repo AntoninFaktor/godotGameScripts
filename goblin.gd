@@ -9,6 +9,7 @@ class_name Goblin2
 @onready var state_chart: StateChart = $StateChart
 @onready var line_of_sight: RayCast2D = RayCast2D.new()
 @onready var pathfinder: PathfinderComponent = $Components/PathfinderComponent
+@onready var game_manager: Node 
 
 var is_dead: bool = false
 var wander_time: float
@@ -30,6 +31,7 @@ var last_known_velocity: Vector2 = Vector2.ZERO
 @export var leave_alert_range: int
 
 func _ready():
+	game_manager = $"../../GameManager"
 	# Initialize raycasts for obstacle avoidance
 	pathfinder.initialize_raycasts(num_dir, avoidance_radius)
 	# Add a RayCast2D for line of sight
@@ -187,6 +189,7 @@ func _on_attack_state_exited() -> void:
 
 #region DEAD STATE
 func _on_dead_state_entered() -> void:
+	game_manager.add_score()
 	velocity = Vector2.ZERO
 	animation_player.play('dead')
 	

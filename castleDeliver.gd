@@ -13,5 +13,5 @@ func _ready() -> void:
 func _on_area_2d_body_entered(body: Node2D) -> void:
 	if player.is_carrying:
 		audio_stream_player_2d.playing = true
-		game_manager.add_point()
+		game_manager.add_gold()
 		player.is_carrying = false
