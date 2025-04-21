@@ -10,6 +10,11 @@ class_name Goblin2
 @onready var line_of_sight: RayCast2D = RayCast2D.new()
 @onready var pathfinder: PathfinderComponent = $Components/PathfinderComponent
 @onready var game_manager: Node 
+@onready var damaged: AudioStreamPlayer2D = $Damaged
+@onready var damaged_2: AudioStreamPlayer2D = $Damaged_2
+@onready var damaged_3: AudioStreamPlayer2D = $Damaged_3
+var damaged_sfx: Array = []
+
 
 var is_dead: bool = false
 var wander_time: float
@@ -31,6 +36,7 @@ var last_known_velocity: Vector2 = Vector2.ZERO
 @export var leave_alert_range: int
 
 func _ready():
+	damaged_sfx = [damaged, damaged_2, damaged_3]
 	game_manager = $"../../GameManager"
 	# Initialize raycasts for obstacle avoidance
 	pathfinder.initialize_raycasts(num_dir, avoidance_radius)
@@ -189,6 +195,8 @@ func _on_attack_state_exited() -> void:
 
 #region DEAD STATE
 func _on_dead_state_entered() -> void:
+	$Died.play()
+	$Died.pitch_scale=randf_range(.8, 1)
 	game_manager.add_score()
 	velocity = Vector2.ZERO
 	animation_player.play('dead')
@@ -196,3 +204,8 @@ func _on_dead_state_entered() -> void:
 func clear_on_dead() -> void:
 	queue_free()
 #endregion
+
+func _on_health_component_damage_taken() -> void:
+	var sound_sfx = damaged_sfx.pick_random()
+	sound_sfx.pitch_scale=randf_range(.8, 1)
+	sound_sfx.play()

@@ -14,8 +14,8 @@ var since_last_bag: float
 var overall_collected: int = 0
 var score: int = 0
 var goblins: Node2D
-var goblin = preload('res://scenes/goblin.tscn')
-var barrel_goblin = preload('res://scenes/barrel_goblin.tscn')
+var goblin = preload('res://scenes/Entities/goblin.tscn')
+var barrel_goblin = preload('res://scenes/Entities/barrel_goblin.tscn')
 var resource_bag = preload("res://scenes/bag.tscn")
 var rng = RandomNumberGenerator.new()
 
@@ -50,10 +50,12 @@ func spawn(enemy) -> void:
 		return
 	var instance = enemy.instantiate()
 	goblins.call_deferred('add_child', instance)
+	instance.z_index = 1
+	instance.y_sort_enabled = true
 	instance.global_position = valid_tiles[rng.randi_range(0, valid_tiles.size() - 1)] * grass_layer.tile_set.tile_size
 
 func add_gold():
-	gold += (roundf(randf_range(1,2)*10))/10
+	gold += (roundf(randf_range(1.2,2.5)*10))/10
 	overall_collected +=1
 	collected_gold.text = str(gold)
 	if overall_collected % 2 == 0:
@@ -66,7 +68,6 @@ func spawn_bag():
 	var instance = resource_bag.instantiate()
 	call_deferred('add_child', instance)
 	instance.global_position = valid_tiles[rng.randi_range(0, valid_tiles.size() - 1)] * grass_layer.tile_set.tile_size
-	
 	bag_spawn.start()
 
 func buy_arrow():
@@ -82,5 +83,4 @@ func _on_timer_timeout() -> void:
 
 func _on_bag_spawn_timeout() -> void:
 	spawn_bag()
-	bag_spawn.wait_time += 1
-	print(bag_spawn.wait_time)
+	bag_spawn.wait_time += 2

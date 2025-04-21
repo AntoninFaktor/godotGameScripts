@@ -11,7 +11,7 @@ var target_enemy
 @onready var state_chart: StateChart = $StateChart
 @onready var movement_blocked: RayCast2D = RayCast2D.new()
 @onready var pathfinder: PathfinderComponent = $Components/PathfinderComponent
-var arrow = preload('res://scenes/arrow.tscn')
+var arrow = preload('res://scenes/Entities/arrow.tscn')
 
 var is_dead: bool = false
 var wander_time: float

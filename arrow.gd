@@ -7,6 +7,9 @@ class_name Arrow
 @onready var sprite: Sprite2D = $Sprite2D
 var target : Vector2
 var direction: Vector2
+@onready var audio_stream_player_2d: AudioStreamPlayer2D = $AudioStreamPlayer2D
+@onready var hitbox_component: hitboxComponent = $hitboxComponent
+
 
 func _on_hitbox_component_area_entered(area: Area2D) -> void:
 	if area is hitboxComponent:
@@ -14,7 +17,11 @@ func _on_hitbox_component_area_entered(area: Area2D) -> void:
 		var attack = Attack.new()
 		attack.attack_dmg = dmg
 		hitbox.take_dmg(attack)
-		queue_free()
+		direction = Vector2.ZERO
+		hitbox_component.queue_free()
+		sprite.frame = 1
+		audio_stream_player_2d.pitch_scale=randf_range(.9, 1.1)
+		audio_stream_player_2d.play(.1)
 
 func arrow_flight(start_position: Vector2, target_position: Vector2):
 	global_position = start_position
